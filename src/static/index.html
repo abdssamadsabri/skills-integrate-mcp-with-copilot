@@ -8,9 +8,34 @@
   </head>
   <body>
     <header>
+      <div class="auth-bar">
+        <div id="auth-status" class="auth-status">Not signed in</div>
+        <button id="login-toggle" class="login-toggle" type="button">👤 Login</button>
+        <button id="logout-button" class="logout-button hidden" type="button">Log out</button>
+      </div>
       <h1>Mergington High School</h1>
       <h2>Extracurricular Activities</h2>
     </header>
+
+    <div id="login-modal" class="modal hidden" aria-modal="true" role="dialog">
+      <div class="modal-content">
+        <h3>Teacher Login</h3>
+        <form id="login-form">
+          <div class="form-group">
+            <label for="username">Username:</label>
+            <input id="username" name="username" type="text" required />
+          </div>
+          <div class="form-group">
+            <label for="password">Password:</label>
+            <input id="password" name="password" type="password" required />
+          </div>
+          <div class="modal-actions">
+            <button type="submit">Login</button>
+            <button type="button" class="secondary" id="cancel-login">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
 
     <main>
       <section id="activities-container">
@@ -23,7 +48,8 @@
 
       <section id="signup-container">
         <h3>Sign Up for an Activity</h3>
-        <form id="signup-form">
+        <div id="teacher-only-message" class="info-message">Teacher login required to manage signups.</div>
+        <form id="signup-form" class="hidden">
           <div class="form-group">
             <label for="email">Student Email:</label>
             <input type="email" id="email" required placeholder="your-email@mergington.edu" />
