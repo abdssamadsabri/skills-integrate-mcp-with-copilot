@@ -5,11 +5,13 @@ A super simple FastAPI application that allows students to view and sign up
 for extracurricular activities at Mergington High School.
 """
 
-from fastapi import FastAPI, HTTPException
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse
+import json
 import os
 from pathlib import Path
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 app = FastAPI(title="Mergington High School API",
               description="API for viewing and signing up for extracurricular activities")
@@ -18,6 +20,24 @@ app = FastAPI(title="Mergington High School API",
 current_dir = Path(__file__).parent
 app.mount("/static", StaticFiles(directory=os.path.join(Path(__file__).parent,
           "static")), name="static")
+
+
+def load_teachers():
+    teachers_path = current_dir / "teachers.json"
+    with open(teachers_path, "r", encoding="utf-8") as file:
+        data = json.load(file)
+    return data.get("teachers", {})
+
+
+teachers = load_teachers()
+
+
+def require_admin(request: Request):
+    username = request.cookies.get("admin_session")
+    if not username or username not in teachers:
+        raise HTTPException(status_code=403, detail="Admin login required to manage activities")
+    return username
+
 
 # In-memory activity database
 activities = {
@@ -88,9 +108,46 @@ def get_activities():
     return activities
 
 
+@app.get("/admin/me")
+def get_admin_user(request: Request):
+    username = request.cookies.get("admin_session")
+    if not username or username not in teachers:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return {"username": username}
+
+
+@app.post("/admin/login")
+async def admin_login(request: Request):
+    payload = await request.json()
+    username = (payload or {}).get("username", "").strip()
+    password = (payload or {}).get("password", "")
+
+    if username in teachers and teachers[username] == password:
+        response = JSONResponse({"message": "Login successful", "username": username})
+        response.set_cookie(
+            key="admin_session",
+            value=username,
+            httponly=True,
+            samesite="lax",
+            path="/",
+        )
+        return response
+
+    raise HTTPException(status_code=401, detail="Invalid username or password")
+
+
+@app.post("/admin/logout")
+def admin_logout():
+    response = JSONResponse({"message": "Logout successful"})
+    response.delete_cookie(key="admin_session", path="/")
+    return response
+
+
 @app.post("/activities/{activity_name}/signup")
-def signup_for_activity(activity_name: str, email: str):
+def signup_for_activity(activity_name: str, email: str, request: Request):
     """Sign up a student for an activity"""
+    require_admin(request)
+
     # Validate activity exists
     if activity_name not in activities:
         raise HTTPException(status_code=404, detail="Activity not found")
@@ -111,8 +168,10 @@ def signup_for_activity(activity_name: str, email: str):
 
 
 @app.delete("/activities/{activity_name}/unregister")
-def unregister_from_activity(activity_name: str, email: str):
+def unregister_from_activity(activity_name: str, email: str, request: Request):
     """Unregister a student from an activity"""
+    require_admin(request)
+
     # Validate activity exists
     if activity_name not in activities:
         raise HTTPException(status_code=404, detail="Activity not found")
